@@ -1,6 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 8788;
+// Test-only values (same as the Worker integration tests). Passed explicitly so e2e works without a local .dev.vars, e.g. in CI.
+const TEST_VARS = [
+  'AUTH_PEPPER:dGVzdC1wZXBwZXItdGVzdC1wZXBwZXItdGVzdC1wZXBwZXI=',
+  'TOTP_ENC_KEY:dGVzdC10b3RwLWtleS10ZXN0LXRvdHAta2V5LXRlc3QtdG8=',
+  'ADMIN_EMAILS:admin@example.com',
+]
+  .map((v) => `--var ${v}`)
+  .join(' ');
 
 export default defineConfig({
   testDir: './e2e',
@@ -16,7 +24,7 @@ export default defineConfig({
     permissions: ['clipboard-read', 'clipboard-write'],
   },
   webServer: {
-    command: `pnpm --filter @vpass/api exec wrangler dev --port ${PORT} --ip 127.0.0.1 --persist-to ../../e2e/.state`,
+    command: `pnpm --filter @vpass/api exec wrangler dev --port ${PORT} --ip 127.0.0.1 --persist-to ../../e2e/.state ${TEST_VARS}`,
     url: `http://localhost:${PORT}/`,
     reuseExistingServer: false,
     timeout: 120_000,
