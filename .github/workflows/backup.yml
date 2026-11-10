@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -26,7 +26,7 @@ jobs:
           pnpm --filter @vpass/api exec wrangler d1 export vpass --remote --output /tmp/vpass.sql
           age -r "$AGE_RECIPIENT" -o "vpass-$(date -u +%Y%m%d).sql.age" /tmp/vpass.sql
           shred -u /tmp/vpass.sql
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vpass-backup
           path: vpass-*.sql.age
