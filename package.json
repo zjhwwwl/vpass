@@ -1,0 +1,29 @@
+{
+  "name": "vpass",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": { "node": ">=22.12" },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "pnpm --filter @vpass/web build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "e2e": "playwright test",
+    "db:migrate:local": "pnpm --filter @vpass/api exec wrangler d1 migrations apply vpass --local",
+    "db:migrate:remote": "pnpm --filter @vpass/api exec wrangler d1 migrations apply vpass --remote",
+    "invite:local": "node scripts/create-invite.mjs --local",
+    "invite:remote": "node scripts/create-invite.mjs --remote"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@playwright/test": "~1.65.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.0.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.2"
+  }
+}

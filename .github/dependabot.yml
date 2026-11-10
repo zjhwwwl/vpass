@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      crypto:
+        patterns: ['libsodium*']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

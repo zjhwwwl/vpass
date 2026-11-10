@@ -1,0 +1,33 @@
+# No secrets in this file. Secrets: `wrangler secret put AUTH_PEPPER` and `wrangler secret put TOTP_ENC_KEY`
+# (local dev reads them from .dev.vars, which is git-ignored).
+name = "vpass"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+
+# Custom domain: Cloudflare creates the DNS record and certificate.
+routes = [{ pattern = "vault.vpass.5201127.xyz", custom_domain = true }]
+
+[assets]
+directory = "../web/dist"
+binding = "ASSETS"
+# Every request goes through the Worker so security headers apply to static files too.
+run_worker_first = true
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "vpass"
+# Replace with the id printed by `wrangler d1 create vpass`.
+database_id = "55b45825-22b8-4044-b36c-37291391e403"
+migrations_dir = "migrations"
+
+[vars]
+# Comma-separated admin emails (may create invites). Not a secret.
+ADMIN_EMAILS = "violetooop@outlook.com"
+
+[observability.logs]
+enabled = true
+# Only path, status and duration are logged by our code; request bodies never are.
+invocation_logs = false

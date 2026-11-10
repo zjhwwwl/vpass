@@ -1,0 +1,30 @@
+[
+  {
+    "password": "correct horse battery staple",
+    "saltHex": "000102030405060708090a0b0c0d0e0f",
+    "ops": 3,
+    "memBytes": 67108864,
+    "hashHex": "0d1a3c6523c8f06e4e0af9c515aa5b5448cfebd6838f2d52c3d8b6ef8ddc3c2e"
+  },
+  {
+    "password": "",
+    "saltHex": "ffffffffffffffffffffffffffffffff",
+    "ops": 3,
+    "memBytes": 67108864,
+    "hashHex": "98bdb9acbc2aa3b8cbf7cbf18ed13c7d398f0ab247de5be2be529e264f6fd287"
+  },
+  {
+    "password": "密码管理器-🔐-ünïcödé",
+    "saltHex": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    "ops": 3,
+    "memBytes": 67108864,
+    "hashHex": "796bf4c4832063a341b560146a19b638577e54fb834a7f1cf58c2e3265ff88d9"
+  },
+  {
+    "password": "ｐａｓｓｗｏｒｄ①",
+    "saltHex": "0f0e0d0c0b0a09080706050403020100",
+    "ops": 3,
+    "memBytes": 67108864,
+    "hashHex": "98b96eaaa6a895b88af251d24a17fc4b1e6d8456140df1f59401c6f9ed80895e"
+  }
+]

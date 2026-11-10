@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local development (git-ignored). Generate with: openssl rand -base64 32
+AUTH_PEPPER=
+TOTP_ENC_KEY=
+ADMIN_EMAILS=admin@example.com

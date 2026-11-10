@@ -1,0 +1,23 @@
+{
+  "name": "@vpass/crypto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./totp": "./src/totp.ts",
+    "./encoding": "./src/encoding.ts",
+    "./kdf-params": "./src/params.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "libsodium-wrappers-sumo": "0.8.4"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "~4.1.12",
+    "vitest": "~4.1.12"
+  }
+}

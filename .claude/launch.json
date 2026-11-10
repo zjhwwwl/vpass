@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vpass",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@vpass/api", "exec", "wrangler", "dev", "--port", "8787", "--ip", "127.0.0.1"],
+      "port": 8787
+    }
+  ]
+}

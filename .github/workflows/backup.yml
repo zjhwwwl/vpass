@@ -1,0 +1,33 @@
+name: Weekly encrypted D1 backup
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: sudo apt-get install -y age
+      - name: Export and encrypt (contents are already ciphertext; age protects metadata like emails and counts)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+        run: |
+          pnpm --filter @vpass/api exec wrangler d1 export vpass --remote --output /tmp/vpass.sql
+          age -r "$AGE_RECIPIENT" -o "vpass-$(date -u +%Y%m%d).sql.age" /tmp/vpass.sql
+          shred -u /tmp/vpass.sql
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vpass-backup
+          path: vpass-*.sql.age
+          retention-days: 90
