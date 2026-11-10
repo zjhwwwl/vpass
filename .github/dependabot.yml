@@ -4,10 +4,18 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Major upgrades (vitest, typescript, …) need manual migration; crypto deps are always reviewed by hand.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
-      crypto:
-        patterns: ['libsodium*']
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+        exclude-patterns: ['libsodium*']
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
