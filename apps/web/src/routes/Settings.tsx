@@ -307,14 +307,22 @@ function TwoFactor({ enabled }: { enabled: boolean }) {
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        api.totpEnable(code).then(refresh, (err) => setError(errorMessage(err)));
+        setBusy(true);
+        session
+          .currentAuthHash(pw)
+          .then((h) => api.totpEnable(code, h))
+          .then(refresh)
+          .catch((err) => setError(errorMessage(err)))
+          .finally(() => setBusy(false));
       }}
     >
       <QrCode text={setup.uri} size={180} />
       <code className="mono">{setup.secret}</code>
       <TextField label="验证器显示的 6 位码" value={code} onChange={setCode} autoComplete="one-time-code" />
+      <PasswordField label="主密码（确认是你本人）" value={pw} onChange={setPw} />
       <ErrorText error={error} />
-      <Button kind="primary" type="submit" disabled={code.length !== 6}>
+      {busy && <KdfProgress />}
+      <Button kind="primary" type="submit" disabled={code.length !== 6 || !pw || busy}>
         开启
       </Button>
     </form>

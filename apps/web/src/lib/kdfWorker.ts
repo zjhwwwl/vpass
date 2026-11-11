@@ -27,6 +27,15 @@ function getWorker(): Worker {
   return worker;
 }
 
+/** Called on lock: drop the worker (and anything left in its heap) entirely. */
+export function terminateKdfWorker(): void {
+  if (!worker) return;
+  worker.terminate();
+  worker = null;
+  for (const p of pending.values()) p.reject(new Error('locked'));
+  pending.clear();
+}
+
 function run<T>(req: WorkerRequest): Promise<T> {
   const id = ++seq;
   return new Promise<T>((resolve, reject) => {

@@ -24,8 +24,8 @@ database_id = "55b45825-22b8-4044-b36c-37291391e403"
 migrations_dir = "migrations"
 
 [vars]
-# Comma-separated admin emails (may create invites). Not a secret.
-ADMIN_EMAILS = "violetooop@outlook.com"
+# Comma-separated admin user IDs (may create invites). Not a secret, not personal data.
+ADMIN_USER_IDS = "faeecb18-9dbd-49dc-a82f-2f5496d9f3a8"
 
 [observability.logs]
 enabled = true

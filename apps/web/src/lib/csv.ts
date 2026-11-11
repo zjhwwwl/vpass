@@ -35,8 +35,25 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
+/** Spreadsheet formula prefixes. Quoting alone does not stop Excel from evaluating them (P6 L4). */
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 export function toCsv(rows: string[][]): string {
-  return rows.map((r) => r.map((f) => (/[",\r\n]/.test(f) || /^[=+\-@]/.test(f) ? `"${f.replace(/"/g, '""')}"` : f)).join(',')).join('\r\n');
+  return rows
+    .map((r) =>
+      r
+        .map((raw) => {
+          const f = FORMULA_START.test(raw) ? `'${raw}` : raw;
+          return /[",\r\n']/.test(f) ? `"${f.replace(/"/g, '""')}"` : f;
+        })
+        .join(','),
+    )
+    .join('\r\n');
+}
+
+/** Undo the export-side formula escape when re-importing our own CSV. */
+function unescapeFormula(f: string): string {
+  return /^'[=+\-@\t\r]/.test(f) ? f.slice(1) : f;
 }
 
 function records(text: string): Record<string, string>[] {
@@ -80,7 +97,9 @@ export function importItems(text: string, format: ImportFormat): Item[] {
         login(r.title ?? '', r.username ?? '', r.password ?? '', [r.url ?? r.website ?? ''], r.notes ?? r.notesplain ?? '', r['one-time password'] ?? r.otpauth ?? ''),
       );
     case 'vpass-csv':
-      return records(text).map((r) => ({
+      return records(text)
+        .map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, unescapeFormula(v)])) as Record<string, string>)
+        .map((r) => ({
         ...emptyItem(r.type === 'note' ? 'note' : 'login'),
         name: r.name ?? '',
         username: r.username ?? '',

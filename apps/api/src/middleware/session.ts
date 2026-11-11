@@ -62,10 +62,10 @@ export const requireSession: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
 };
 
-export function isAdmin(c: Context<AppEnv>, email: string): boolean {
-  return (c.env.ADMIN_EMAILS ?? '')
+export function isAdmin(c: Context<AppEnv>, userId: string): boolean {
+  return (c.env.ADMIN_USER_IDS ?? '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
-    .includes(email.toLowerCase());
+    .includes(userId.toLowerCase());
 }

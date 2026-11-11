@@ -250,3 +250,11 @@ describe('key rotation', () => {
     expect(await snapshot()).toEqual(pre);
   });
 });
+
+describe('lookup rate limit (P6 L8)', () => {
+  it('60 lookups per 15 minutes per member', async () => {
+    const a = await registerUser();
+    for (let i = 0; i < 60; i++) expect((await a.client.req('GET', `/api/users/lookup?email=x${i}@example.com`)).status).toBe(404);
+    expect((await a.client.req('GET', '/api/users/lookup?email=y@example.com')).status).toBe(429);
+  });
+});

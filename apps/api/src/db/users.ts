@@ -42,7 +42,7 @@ export function keyBundle(c: Context<AppEnv>, u: UserRow): KeyBundleDto {
     wrappedAccountKey: u.wrapped_account_key,
     publicKey: u.public_key,
     wrappedPrivateKey: u.wrapped_private_key,
-    isAdmin: isAdmin(c, u.email),
+    isAdmin: isAdmin(c, u.id),
     totpEnabled: totpState(u)?.enabled === true,
   };
 }

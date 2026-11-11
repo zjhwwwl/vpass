@@ -128,8 +128,8 @@ describe('Argon2id (cross-checked with argon2-cffi)', () => {
     for (const p of bad) expect(() => assertKdfParams(p)).toThrow('weak_kdf_params');
     expect(() => assertKdfParams({ ...DEFAULT_KDF_PARAMS, alg: 'argon2i13' as 'argon2id13' })).toThrow('unsupported_kdf');
     expect(() => assertKdfParams({ ...DEFAULT_KDF_PARAMS, v: 2 as 1 })).toThrow('unsupported_kdf');
-    expect(() => assertKdfParams({ ...DEFAULT_KDF_PARAMS, ops: 21 })).toThrow('unsupported_kdf');
-    expect(() => assertKdfParams({ ...DEFAULT_KDF_PARAMS, mem: 2 * 1024 * 1024 * 1024 })).toThrow('unsupported_kdf');
+    expect(() => assertKdfParams({ ...DEFAULT_KDF_PARAMS, ops: 11 })).toThrow('unsupported_kdf');
+    expect(() => assertKdfParams({ ...DEFAULT_KDF_PARAMS, mem: 257 * 1024 * 1024 })).toThrow('unsupported_kdf');
   });
 });
 

@@ -4,7 +4,7 @@ import { HUMAN_INVITE_ALPHABET } from '../lib/constants.js';
 import type { AppEnv } from '../env.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { err, now } from '../lib/http.js';
-import { audit } from '../db/audit.js';
+import { audit, WINDOW_MS } from '../db/audit.js';
 import { isAdmin, requireSession } from '../middleware/session.js';
 import { normalizeInvite } from './auth.js';
 
@@ -16,6 +16,12 @@ users.use('/invites', requireSession);
 users.get('/users/lookup', async (c) => {
   const parsed = emailSchema.safeParse(c.req.query('email') ?? '');
   if (!parsed.success) throw err(400, 'bad_request');
+  // Limit address-book probing by a logged-in member (P6 L8): 60 lookups per 15 minutes.
+  const n = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE user_id = ? AND event = 'lookup' AND created_at > ?")
+    .bind(c.var.session.userId, now() - WINDOW_MS)
+    .first<{ n: number }>();
+  if ((n?.n ?? 0) >= 60) throw err(429, 'rate_limited');
+  await audit(c, c.var.session.userId, 'lookup');
   const u = await c.env.DB.prepare('SELECT id, email, public_key FROM users WHERE email = ?').bind(parsed.data).first<{ id: string; email: string; public_key: string }>();
   if (!u) throw err(404, 'not_found');
   return c.json({ userId: u.id, email: u.email, publicKey: u.public_key });
@@ -33,7 +39,7 @@ export function generateInviteCode(): string {
 
 // POST /api/invites — admin only. The code is shown once; only its hash is stored.
 users.post('/invites', async (c) => {
-  if (!isAdmin(c, c.var.session.email)) throw err(403, 'forbidden');
+  if (!isAdmin(c, c.var.session.userId)) throw err(403, 'forbidden');
   const code = generateInviteCode();
   const expiresAt = now() + INVITE_TTL_MS;
   await c.env.DB.prepare('INSERT INTO invites (code_hash, created_by, used_by, expires_at) VALUES (?, ?, NULL, ?)')

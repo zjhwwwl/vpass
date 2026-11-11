@@ -32,7 +32,7 @@ import {
 import type { ItemDto, KeyBundleDto, MemberDto, Role, VaultDto } from '@vpass/shared';
 import { api, ApiError, OfflineError } from '../lib/api.js';
 import { idb, type Settings, DEFAULT_SETTINGS } from '../lib/idb.js';
-import { kdf } from '../lib/kdfWorker.js';
+import { kdf, terminateKdfWorker } from '../lib/kdfWorker.js';
 import { normalizeItem, type Item } from '../lib/item.js';
 
 export type Status = 'booting' | 'loggedOut' | 'locked' | 'unlocked';
@@ -72,6 +72,11 @@ export interface PublicState {
   online: boolean;
   hasDeviceKey: boolean;
   syncing: boolean;
+  /**
+   * Data the server sent that could not be decrypted or does not add up (P6 H1, partial mitigation): vault keys
+   * that do not open, items that fail authentication, or more than one "personal" vault. Never silently ignored.
+   */
+  integrityIssues: string[];
   lastSyncAt: number | null;
   lastError: string | null;
   settings: Settings;
@@ -95,6 +100,7 @@ let state: PublicState = {
   online: true,
   hasDeviceKey: false,
   syncing: false,
+  integrityIssues: [],
   lastSyncAt: null,
   lastError: null,
   settings: DEFAULT_SETTINGS,
@@ -256,6 +262,7 @@ export const session = {
   },
 
   lock(): void {
+    terminateKdfWorker();
     if (account) wipe(account.accountKey, account.privateKey);
     account = null;
     for (const v of vaults.values()) wipe(v.key);
@@ -550,6 +557,9 @@ async function applyVaults(list: VaultDto[], fromCache: boolean): Promise<boolea
   if (!acct) return false;
   let resync = false;
   const seen = new Set<string>();
+  const issues: string[] = [];
+  const personal = list.filter((d) => d.kind === 'personal');
+  if (personal.length > 1) issues.push(`服务器返回了 ${personal.length} 个“个人保管库”，正常应只有 1 个`);
   for (const dto of list) {
     seen.add(dto.id);
     let v = vaults.get(dto.id);
@@ -568,6 +578,7 @@ async function applyVaults(list: VaultDto[], fromCache: boolean): Promise<boolea
       try {
         key = await openVaultKey(acct, dto.sealedVaultKey);
       } catch {
+        issues.push(`保管库 ${dto.id.slice(0, 8)} 的密钥无法用你的私钥打开`);
         continue;
       }
       let name = '个人保管库';
@@ -611,7 +622,8 @@ async function applyVaults(list: VaultDto[], fromCache: boolean): Promise<boolea
         v.items.set(it.id, { id: it.id, vaultId: dto.id, revision: it.revision, updatedAt: it.updatedAt, item });
         v.raw.set(it.id, it);
       } catch {
-        /* tampered or foreign ciphertext: refuse it */
+        // Tampered or foreign ciphertext: refuse it, and tell the user.
+        issues.push(`保管库 ${dto.id.slice(0, 8)} 中的条目 ${it.id.slice(0, 8)} 无法解密`);
       }
     }
     v.meta = { ...v.meta, role: dto.role, revision: dto.revision };
@@ -624,6 +636,7 @@ async function applyVaults(list: VaultDto[], fromCache: boolean): Promise<boolea
       }
     }
   }
+  if (!fromCache) state = { ...state, integrityIssues: issues };
   return resync;
 }
 

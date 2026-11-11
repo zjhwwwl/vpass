@@ -16,6 +16,8 @@ export const CSP = [
   "frame-ancestors 'none'",
   "object-src 'none'",
   "require-trusted-types-for 'script'",
+  // Only the app's own policy may exist; injected code cannot create a permissive `default` policy.
+  'trusted-types vpass',
 ].join('; ');
 
 export const SECURITY_HEADERS: Record<string, string> = {

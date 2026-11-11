@@ -91,6 +91,19 @@ export function VaultApp({ st }: { st: PublicState }) {
         </div>
       </header>
       {!st.online && <div className="banner">离线模式：显示的是本机缓存，修改需要联网。</div>}
+      {st.integrityIssues.length > 0 && (
+        <div className="banner danger" role="alert">
+          <strong>有 {st.integrityIssues.length} 处数据无法验证，可能被篡改，已拒绝显示。</strong>
+          <details>
+            <summary>详情</summary>
+            <ul>
+              {st.integrityIssues.map((x, i) => (
+                <li key={i}>{x}</li>
+              ))}
+            </ul>
+          </details>
+        </div>
+      )}
       <div className="columns">
         <nav className={`sidebar${menu ? ' open' : ''}`}>
           <div className="nav-group">

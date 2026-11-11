@@ -14,7 +14,7 @@ import {
 import { fromB64u, toBase32Rfc4648 } from '@vpass/crypto/encoding';
 import { otpauthUri, verifyTotp } from '@vpass/crypto/totp';
 import type { AppEnv } from '../env.js';
-import { decryptTotpSecret, encryptTotpSecret, fakeSalt, hmacB64, sha256Hex, timingSafeEqualB64 } from '../lib/crypto.js';
+import { decryptTotpSecret, emailKey, encryptTotpSecret, fakeSalt, hmacB64, sha256Hex, timingSafeEqualB64 } from '../lib/crypto.js';
 import { body, err, now } from '../lib/http.js';
 import { audit, auditStmt, enforceRateLimit, recordFailure } from '../db/audit.js';
 import { keyBundle, totpState, userByEmail, userById, type UserRow } from '../db/users.js';
@@ -104,16 +104,13 @@ export function normalizeInvite(code: string): string {
 // POST /api/auth/login
 auth.post('/login', async (c) => {
   const r = await body(c, loginReq);
+  const ek = await emailKey(c.env.AUTH_PEPPER, r.email);
+  await enforceRateLimit(c, ek);
   const u = await userByEmail(c, r.email);
-  await enforceRateLimit(c, u?.id ?? null);
   const t = now();
-  if (u?.locked_until && u.locked_until > t) {
-    await authHmac(c, r.authHash); // equalize work
-    throw err(429, 'account_locked');
-  }
   const ok = await verifyAuthHash(c, u, r.authHash);
   if (!ok || !u) {
-    await recordFailure(c, u?.id ?? null, 'login_fail');
+    await recordFailure(c, ek, 'login_fail');
     throw err(401, 'invalid_credentials');
   }
   const totp = totpState(u);
@@ -122,13 +119,20 @@ auth.post('/login', async (c) => {
     const secret = await decryptTotpSecret(c.env.TOTP_ENC_KEY, u.id, totp);
     const counter = await verifyTotp(secret, r.totp, Math.floor(t / 1000));
     if (counter === null || counter <= totp.lastCounter) {
-      await recordFailure(c, u.id, 'login_fail');
+      await recordFailure(c, ek, 'login_fail');
       throw err(401, 'invalid_credentials');
     }
-    await c.env.DB.prepare('UPDATE users SET totp_secret_enc = ? WHERE id = ?').bind(JSON.stringify({ ...totp, lastCounter: counter }), u.id).run();
+    // Compare-and-swap on the stored state, so two concurrent requests cannot both spend the same code.
+    const swap = await c.env.DB.prepare('UPDATE users SET totp_secret_enc = ? WHERE id = ? AND totp_secret_enc = ?')
+      .bind(JSON.stringify({ ...totp, lastCounter: counter }), u.id, u.totp_secret_enc)
+      .run();
+    if (swap.meta.changes !== 1) {
+      await recordFailure(c, ek, 'login_fail');
+      throw err(401, 'invalid_credentials');
+    }
   }
   await c.env.DB.batch([
-    c.env.DB.prepare('UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?').bind(u.id),
+    c.env.DB.prepare('UPDATE users SET failed_logins = 0 WHERE id = ?').bind(u.id),
     auditStmt(c, u.id, 'login_ok'),
   ]);
   await createSession(c, u.id, r.deviceLabel);
@@ -143,11 +147,12 @@ auth.post('/recover/start', async (c) => {
 });
 
 async function checkRecovery(c: Context<AppEnv>, email: string, recoveryAuth: string): Promise<UserRow> {
+  const ek = await emailKey(c.env.AUTH_PEPPER, email);
+  await enforceRateLimit(c, ek);
   const u = await userByEmail(c, email);
-  await enforceRateLimit(c, u?.id ?? null);
   const got = await recoveryHmac(c, recoveryAuth);
   if (!timingSafeEqualB64(got, u?.recovery_auth_hmac ?? DUMMY_HMAC) || !u) {
-    await recordFailure(c, u?.id ?? null, 'recover_fail');
+    await recordFailure(c, ek, 'recover_fail');
     throw err(401, 'invalid_credentials');
   }
   return u;
@@ -161,7 +166,7 @@ auth.post('/recover', async (c) => {
   await db.batch([
     db
       .prepare(
-        'UPDATE users SET kdf_salt = ?, kdf_params = ?, auth_hmac = ?, wrapped_account_key = ?, recovery_wrapped_key = ?, recovery_auth_hmac = ?, failed_logins = 0, locked_until = NULL WHERE id = ?',
+        'UPDATE users SET kdf_salt = ?, kdf_params = ?, auth_hmac = ?, wrapped_account_key = ?, recovery_wrapped_key = ?, recovery_auth_hmac = ?, failed_logins = 0 WHERE id = ?',
       )
       .bind(r.kdfSalt, JSON.stringify(r.kdfParams), await authHmac(c, r.authHash), r.wrappedAccountKey, r.newRecoveryWrappedKey, await recoveryHmac(c, r.newRecoveryAuth), u.id),
     db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(u.id),
@@ -219,10 +224,11 @@ auth.delete('/sessions/:id', async (c) => {
 });
 
 async function requireAuthHash(c: Context<AppEnv>, authHash: string): Promise<UserRow> {
+  const ek = await emailKey(c.env.AUTH_PEPPER, c.var.session.email);
+  await enforceRateLimit(c, ek);
   const u = await userById(c, c.var.session.userId);
-  await enforceRateLimit(c, c.var.session.userId);
   if (!u || !(await verifyAuthHash(c, u, authHash))) {
-    await recordFailure(c, c.var.session.userId, 'login_fail');
+    await recordFailure(c, ek, 'login_fail');
     throw err(401, 'invalid_credentials');
   }
   return u;
@@ -268,14 +274,15 @@ auth.post('/totp/setup', async (c) => {
 
 auth.post('/totp/enable', async (c) => {
   const r = await body(c, totpEnableReq);
-  const u = (await userById(c, c.var.session.userId))!;
+  // Re-authenticate: a stolen session alone must not be able to bind an attacker-controlled second factor.
+  const u = await requireAuthHash(c, r.authHash);
   const st = totpState(u);
   if (!st || st.enabled) throw err(409, 'conflict');
   const secret = await decryptTotpSecret(c.env.TOTP_ENC_KEY, u.id, st);
   const counter = await verifyTotp(secret, r.code, Math.floor(now() / 1000));
   if (counter === null) throw err(400, 'invalid_credentials');
   await c.env.DB.batch([
-    c.env.DB.prepare('UPDATE users SET totp_secret_enc = ? WHERE id = ?').bind(JSON.stringify({ ...st, enabled: true, lastCounter: counter }), u.id),
+    c.env.DB.prepare('UPDATE users SET totp_secret_enc = ? WHERE id = ? AND totp_secret_enc = ?').bind(JSON.stringify({ ...st, enabled: true, lastCounter: counter }), u.id, u.totp_secret_enc),
     auditStmt(c, u.id, 'totp_enable'),
   ]);
   return c.json({ ok: true });

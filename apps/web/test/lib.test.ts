@@ -4,11 +4,12 @@ import { emptyItem, normalizeItem, safeHttpUrl, withPasswordHistory } from '../s
 
 describe('csv', () => {
   it('parses quotes, commas, newlines and BOM', () => {
-    expect(parseCsv('﻿a,b\r\n"x, y","he said ""hi""\nok"\n')).toEqual([
+    expect(parseCsv('\uFEFFa,b\r\n"x, y","he said ""hi""\nok"\n')).toEqual([
       ['a', 'b'],
       ['x, y', 'he said "hi"\nok'],
     ]);
-    expect(parseCsv(toCsv([['=cmd', 'a"b']]))).toEqual([['=cmd', 'a"b']]);
+    expect(parseCsv(toCsv([['=cmd', 'a"b']]))).toEqual([["'=cmd", 'a"b']]);
+    for (const evil of ['=HYPERLINK("http://x")', '+1', '-1+1', '@SUM(1)', String.fromCharCode(9) + 'x']) expect(toCsv([[evil]]).replace(/^"/, '')).toMatch(/^'/);
   });
 
   it('imports Chrome, Bitwarden CSV/JSON and 1Password', () => {
@@ -32,10 +33,10 @@ describe('csv', () => {
   });
 
   it('round-trips its own CSV export and skips contacts', () => {
-    const a = { ...emptyItem('login'), name: 'X', username: 'u', password: 'p,"q"', urls: ['https://x.example'] };
+    const a = { ...emptyItem('login'), name: 'X', username: 'u', password: '=p,"q"', urls: ['https://x.example'] };
     const csv = exportCsv([a, { ...emptyItem('contact'), name: 'friend' }]);
     expect(csv).not.toContain('friend');
-    expect(importItems(csv, detectFormat(csv)!)[0]).toMatchObject({ name: 'X', password: 'p,"q"', urls: ['https://x.example'] });
+    expect(importItems(csv, detectFormat(csv)!)[0]).toMatchObject({ name: 'X', password: '=p,"q"', urls: ['https://x.example'] });
   });
 });
 

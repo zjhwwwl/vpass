@@ -21,7 +21,8 @@ export function assertKdfParams(p: KdfParams): void {
   if (!Number.isInteger(p.ops) || !Number.isInteger(p.mem) || p.ops < DEFAULT_KDF_PARAMS.ops || p.mem < DEFAULT_KDF_PARAMS.mem) {
     throw new Error('weak_kdf_params');
   }
-  if (p.ops > 20 || p.mem > 1024 * 1024 * 1024) throw new Error('unsupported_kdf');
+  // Upper bounds stop a malicious server from making the client hang or run out of memory.
+  if (p.ops > 10 || p.mem > 256 * 1024 * 1024) throw new Error('unsupported_kdf');
 }
 
 /** pwPart = Argon2id(NFKC(password), salt). */

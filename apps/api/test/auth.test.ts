@@ -140,24 +140,44 @@ describe('login, sessions, lockout', () => {
     expect((await b.client.req('GET', '/api/auth/me')).status).toBe(200);
   });
 
-  it('10 consecutive failures lock the account for 15 minutes (even from fresh IPs)', async () => {
+  it('no hard lockout: 10 distributed failures do not lock the real user out (P6 M3)', async () => {
     const u = await registerUser();
     for (let i = 0; i < 10; i++) {
-      const c = client(`192.0.2.${i}`);
-      expect((await c.req('POST', '/api/auth/login', { email: u.email, authHash: fakeKey() })).status).toBe(401);
+      expect((await client(`192.0.2.${i}`).req('POST', '/api/auth/login', { email: u.email, authHash: fakeKey() })).status).toBe(401);
     }
-    const c = client('198.51.100.1');
-    const res = await c.req('POST', '/api/auth/login', { email: u.email, authHash: u.authHash });
-    expect(res.status).toBe(429);
-    const row = await env.DB.prepare('SELECT failed_logins, locked_until FROM users WHERE id = ?').bind(u.userId).first<{ failed_logins: number; locked_until: number }>();
-    expect(row!.failed_logins).toBe(10);
-    expect(row!.locked_until).toBeGreaterThan(Date.now() + 14 * 60_000);
-    // After the lock expires and the window passes, the right password works and resets the counter.
-    await env.DB.prepare('UPDATE users SET locked_until = ? WHERE id = ?').bind(Date.now() - 1, u.userId).run();
-    await env.DB.prepare('UPDATE audit_log SET created_at = 0 WHERE user_id = ?').bind(u.userId).run();
-    expect((await c.req('POST', '/api/auth/login', { email: u.email, authHash: u.authHash })).status).toBe(200);
-    const after = await env.DB.prepare('SELECT failed_logins, locked_until FROM users WHERE id = ?').bind(u.userId).first();
-    expect(after).toEqual({ failed_logins: 0, locked_until: null });
+    expect((await client('198.51.100.1').req('POST', '/api/auth/login', { email: u.email, authHash: u.authHash })).status).toBe(200);
+  });
+
+  it('per-email limit (30 / 15 min across IPs) behaves identically for existing and unknown emails', async () => {
+    const u = await registerUser();
+    const ghost = 'ghost-limit@example.com';
+    for (const email of [u.email, ghost]) {
+      for (let i = 0; i < 30; i++) {
+        const ip = `198.18.${email === ghost ? 1 : 0}.${i}`;
+        expect((await client(ip).req('POST', '/api/auth/login', { email, authHash: fakeKey() })).status).toBe(401);
+      }
+    }
+    const real = await client('198.19.0.1').req('POST', '/api/auth/login', { email: u.email, authHash: u.authHash });
+    const fake = await client('198.19.0.2').req('POST', '/api/auth/login', { email: ghost, authHash: fakeKey() });
+    expect(real.status).toBe(429);
+    expect(await json(real)).toEqual({ error: 'rate_limited' });
+    expect(fake.status).toBe(429);
+    expect(await json(fake)).toEqual({ error: 'rate_limited' });
+    // Failures are keyed by an email HMAC, never by the user row, so nothing reveals which account exists.
+    const rows = await env.DB.prepare("SELECT DISTINCT user_id FROM audit_log WHERE event = 'login_fail' AND user_id LIKE 'em:%'").all();
+    expect(rows.results.length).toBeGreaterThanOrEqual(2);
+    expect(JSON.stringify(rows.results)).not.toContain(u.userId);
+    // After the window passes the real user gets in again.
+    await env.DB.prepare('UPDATE audit_log SET created_at = 0').run();
+    expect((await client('198.19.0.3').req('POST', '/api/auth/login', { email: u.email, authHash: u.authHash })).status).toBe(200);
+  });
+
+  it('IPv6 clients are counted per /64', async () => {
+    const { ipBucket } = await import('../src/lib/crypto.js');
+    expect(ipBucket('2001:db8:1:2:aaaa::1')).toBe(ipBucket('2001:0db8:0001:0002:ffff:1:2:3'));
+    expect(ipBucket('2001:db8:1:2::1')).not.toBe(ipBucket('2001:db8:1:3::1'));
+    expect(ipBucket('::1')).toBe('0:0:0:0::/64');
+    expect(ipBucket('203.0.113.9')).toBe('203.0.113.9');
   });
 
   it('per-IP rate limit: 10 failures from one IP across many emails → 429', async () => {
@@ -234,7 +254,7 @@ describe('invites', () => {
   it('only admins can create invites, and the code works once', async () => {
     const u = await registerUser();
     expect((await u.client.req('POST', '/api/invites')).status).toBe(403);
-    const admin = await registerUser('admin@example.com');
+    const admin = await registerUser(undefined, '00000000-0000-4000-8000-000000000001');
     const res = await admin.client.req('POST', '/api/invites');
     expect(res.status).toBe(201);
     const { code } = await json<{ code: string }>(res);
@@ -255,8 +275,12 @@ describe('login TOTP', () => {
     expect(setup.uri).toMatch(/^otpauth:\/\/totp\//);
     const secret = fromBase32Rfc4648(setup.secret);
     const counter = Math.floor(Date.now() / 30_000);
-    expect((await u.client.req('POST', '/api/auth/totp/enable', { code: '000000' === (await hotp(secret, counter)) ? '111111' : '000000' })).status).toBe(400);
-    expect((await u.client.req('POST', '/api/auth/totp/enable', { code: await hotp(secret, counter) })).status).toBe(200);
+    const wrong = '000000' === (await hotp(secret, counter)) ? '111111' : '000000';
+    expect((await u.client.req('POST', '/api/auth/totp/enable', { code: wrong, authHash: u.authHash })).status).toBe(400);
+    // Enabling requires re-authentication (P6 L2).
+    expect((await u.client.req('POST', '/api/auth/totp/enable', { code: await hotp(secret, counter), authHash: fakeKey() })).status).toBe(401);
+    expect((await u.client.req('POST', '/api/auth/totp/enable', { code: await hotp(secret, counter) })).status).toBe(400);
+    expect((await u.client.req('POST', '/api/auth/totp/enable', { code: await hotp(secret, counter), authHash: u.authHash })).status).toBe(200);
     expect((await u.client.req('POST', '/api/auth/totp/setup')).status).toBe(409);
     const row = await env.DB.prepare('SELECT totp_secret_enc FROM users WHERE id = ?').bind(u.userId).first<{ totp_secret_enc: string }>();
     expect(row!.totp_secret_enc).not.toContain(setup.secret);
@@ -274,5 +298,39 @@ describe('login TOTP', () => {
     expect((await c.req('POST', '/api/auth/totp/disable', { authHash: fakeKey() })).status).toBe(401);
     expect((await c.req('POST', '/api/auth/totp/disable', { authHash: u.authHash })).status).toBe(200);
     expect((await client().req('POST', '/api/auth/login', { email: u.email, authHash: u.authHash })).status).toBe(200);
+  });
+});
+
+describe('hardening from the P6 review', () => {
+  it('rejects bodies over the cap even without Content-Length (chunked)', async () => {
+    const { exports } = await import('cloudflare:workers');
+    const big = new ReadableStream({
+      start(ctrl) {
+        const chunk = new Uint8Array(1024 * 1024).fill(32);
+        for (let i = 0; i < 33; i++) ctrl.enqueue(chunk);
+        ctrl.close();
+      },
+    });
+    const res = await exports.default.fetch(
+      new Request('https://pv.test/api/auth/prelogin', {
+        method: 'POST',
+        headers: { Origin: 'https://pv.test', 'X-Requested-With': 'vpass', 'Content-Type': 'application/json' },
+        body: big,
+        // @ts-expect-error duplex is required for streaming request bodies
+        duplex: 'half',
+      }),
+    );
+    expect(res.status).toBe(413);
+  });
+
+  it('server-provided KDF params above 256 MiB / ops 10 are rejected', async () => {
+    const c = client();
+    const r = await c.req('POST', '/api/auth/register', { inviteCode: 'x'.repeat(10), kdfParams: { ...KDF, mem: 512 * 1024 * 1024 } });
+    expect(r.status).toBe(400);
+  });
+
+  it('the CSP only allows the app’s own Trusted Types policy', async () => {
+    const res = await client().req('GET', '/api/auth/me');
+    expect(res.headers.get('Content-Security-Policy')).toContain('trusted-types vpass');
   });
 });

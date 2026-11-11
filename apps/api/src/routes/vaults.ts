@@ -65,7 +65,7 @@ export function itemDto(r: ItemRow): ItemDto {
 const ABORT = "json('conflict')";
 
 function isAbort(e: unknown): boolean {
-  return e instanceof Error && /malformed JSON|JSON/i.test(e.message);
+  return e instanceof Error && /malformed JSON/i.test(e.message);
 }
 
 async function currentItem(c: Context<AppEnv>, iid: string): Promise<ItemRow | null> {

@@ -5,8 +5,8 @@ export interface Env {
   AUTH_PEPPER: string;
   /** base64, 32 bytes. Worker secret. */
   TOTP_ENC_KEY: string;
-  /** Comma-separated admin emails. Plain var. */
-  ADMIN_EMAILS: string;
+  /** Comma-separated admin user IDs (UUIDs). Plain var. Not emails: an unregistered admin email could be claimed by anyone with an invite. */
+  ADMIN_USER_IDS: string;
 }
 
 export interface Session {

@@ -5,7 +5,7 @@ const PORT = 8788;
 const TEST_VARS = [
   'AUTH_PEPPER:dGVzdC1wZXBwZXItdGVzdC1wZXBwZXItdGVzdC1wZXBwZXI=',
   'TOTP_ENC_KEY:dGVzdC10b3RwLWtleS10ZXN0LXRvdHAta2V5LXRlc3QtdG8=',
-  'ADMIN_EMAILS:admin@example.com',
+  'ADMIN_USER_IDS:00000000-0000-4000-8000-000000000001',
 ]
   .map((v) => `--var ${v}`)
   .join(' ');

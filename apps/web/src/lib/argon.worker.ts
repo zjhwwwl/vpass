@@ -38,9 +38,24 @@ self.onmessage = async (ev: MessageEvent<{ id: number; req: WorkerRequest }>) =>
         result = await decryptExport(req.password, req.file);
         break;
     }
+    // postMessage clones synchronously, so the worker's own copies can be zeroed right after (P6 L5).
     (self as unknown as Worker).postMessage({ id, ok: true, result });
+    wipeDeep(result);
   } catch (e) {
     // Only the error code crosses back; never inputs.
     (self as unknown as Worker).postMessage({ id, ok: false, error: e instanceof Error ? e.message : 'internal' });
+  } finally {
+    wipeDeep(req);
   }
 };
+
+/** Best-effort: zero every Uint8Array reachable from a value (keys, salts, hashes). */
+function wipeDeep(v: unknown, seen = new Set<unknown>()): void {
+  if (v === null || typeof v !== 'object' || seen.has(v)) return;
+  seen.add(v);
+  if (v instanceof Uint8Array) {
+    v.fill(0);
+    return;
+  }
+  for (const x of Object.values(v as Record<string, unknown>)) wipeDeep(x, seen);
+}

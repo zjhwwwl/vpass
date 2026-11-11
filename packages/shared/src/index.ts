@@ -44,12 +44,12 @@ export const email = z
 
 export const kdfParams = z.object({
   alg: z.literal('argon2id13'),
-  ops: z.number().int().min(3).max(20),
+  ops: z.number().int().min(3).max(10),
   mem: z
     .number()
     .int()
     .min(64 * 1024 * 1024)
-    .max(1024 * 1024 * 1024),
+    .max(256 * 1024 * 1024),
   v: z.literal(1),
 });
 export type KdfParamsDto = z.infer<typeof kdfParams>;
@@ -121,7 +121,7 @@ export const recoverReq = z.object({
 export const recoveryCodeReq = z.object({ authHash: b64u32, recoveryWrappedKey: envelope(), recoveryAuth: b64u32 });
 
 export const totpSetupRes = z.object({ secret: z.string(), uri: z.string() });
-export const totpEnableReq = z.object({ code: totpCode });
+export const totpEnableReq = z.object({ code: totpCode, authHash: b64u32 });
 export const totpDisableReq = z.object({ authHash: b64u32 });
 
 export const sessionInfo = z.object({
@@ -203,7 +203,6 @@ export const ERROR_CODES = [
   'invalid_credentials',
   'totp_required',
   'rate_limited',
-  'account_locked',
   'invalid_invite',
   'email_taken',
   'csrf',

@@ -74,12 +74,12 @@ export interface TestUser {
   publicKey: string;
 }
 
-export async function registerUser(email = `u${crypto.randomUUID().slice(0, 8)}@example.com`): Promise<TestUser> {
+export async function registerUser(email = `u${crypto.randomUUID().slice(0, 8)}@example.com`, userId: string = crypto.randomUUID()): Promise<TestUser> {
   const c = client();
   const inviteCode = await seedInvite();
   const u = {
     inviteCode,
-    userId: crypto.randomUUID(),
+    userId,
     email,
     kdfSalt: fakeSalt(),
     kdfParams: KDF,

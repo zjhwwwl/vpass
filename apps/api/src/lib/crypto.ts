@@ -71,8 +71,27 @@ export async function fakeSalt(pepper: string, email: string): Promise<string> {
   return toB64u(h.subarray(0, 16));
 }
 
+/** Rate-limit key for an email, identical whether or not the account exists (decisions D-23). */
+export async function emailKey(pepper: string, email: string): Promise<string> {
+  const h = await hmac(pepper, `email|v1|${email.trim().toLowerCase()}`);
+  return `em:${toHex(h.subarray(0, 16))}`;
+}
+
+/** IPv6 clients usually control a whole /64, so count them per /64. */
+export function ipBucket(ip: string): string {
+  if (!ip.includes(':')) return ip;
+  const [head = '', tail = ''] = ip.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail ? tail.split(':') : [];
+  const full = ip.includes('::') ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
+  return `${full
+    .slice(0, 4)
+    .map((x) => (parseInt(x || '0', 16) || 0).toString(16))
+    .join(':')}::/64`;
+}
+
 export async function ipHash(pepper: string, ip: string): Promise<string> {
-  const h = await hmac(pepper, `ip|v1|${ip}`);
+  const h = await hmac(pepper, `ip|v1|${ipBucket(ip)}`);
   return toHex(h.subarray(0, 16));
 }
 

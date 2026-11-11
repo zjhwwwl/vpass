@@ -16,7 +16,8 @@ export type AuditEvent =
   | 'invite_create'
   | 'vault_create'
   | 'share'
-  | 'rotate';
+  | 'rotate'
+  | 'lookup';
 
 export function auditStmt(c: Context<AppEnv>, userId: string | null, event: AuditEvent): D1PreparedStatement {
   return c.env.DB.prepare('INSERT INTO audit_log (user_id, event, ip_hash, created_at) VALUES (?,?,?,?)').bind(userId, event, c.var.ipHash ?? null, now());
@@ -26,39 +27,36 @@ export async function audit(c: Context<AppEnv>, userId: string | null, event: Au
   await auditStmt(c, userId, event).run();
 }
 
-// ---- rate limiting (decisions D-10)
+// ---- rate limiting (decisions D-10, revised in D-23 after the P6 review)
+//
+// Failures are counted per IP hash and per *email key* (HMAC of the normalized email), never per user row, so an
+// existing and a non-existent account behave identically (no enumeration). There is no hard account lock: a
+// distributed attacker could otherwise keep a friend locked out forever. Instead:
+//   - one IP: at most 10 failed login/recovery attempts per 15 minutes;
+//   - one email (from all IPs together): at most 30 per 15 minutes;
+// plus the Cloudflare WAF rule on /api/auth/*. Every refusal is the same `rate_limited`.
 
 export const WINDOW_MS = 15 * 60 * 1000;
-export const MAX_FAILURES_PER_WINDOW = 10;
-export const LOCK_AFTER_CONSECUTIVE = 10;
-export const LOCK_MS = 15 * 60 * 1000;
+export const MAX_FAILURES_PER_IP = 10;
+export const MAX_FAILURES_PER_EMAIL = 30;
 
 const FAIL_EVENTS = "('login_fail','recover_fail')";
 
-/** Throws 429 when this IP or this account had ≥10 failed login/recovery attempts in the last 15 minutes. */
-export async function enforceRateLimit(c: Context<AppEnv>, userId: string | null): Promise<void> {
+export async function enforceRateLimit(c: Context<AppEnv>, emailKey: string | null): Promise<void> {
   const since = now() - WINDOW_MS;
   const byIp = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE ip_hash = ? AND event IN ${FAIL_EVENTS} AND created_at > ?`)
     .bind(c.var.ipHash, since)
     .first<{ n: number }>();
-  if ((byIp?.n ?? 0) >= MAX_FAILURES_PER_WINDOW) throw err(429, 'rate_limited');
-  if (userId) {
-    const byUser = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE user_id = ? AND event IN ${FAIL_EVENTS} AND created_at > ?`)
-      .bind(userId, since)
+  if ((byIp?.n ?? 0) >= MAX_FAILURES_PER_IP) throw err(429, 'rate_limited');
+  if (emailKey) {
+    const byEmail = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE user_id = ? AND event IN ${FAIL_EVENTS} AND created_at > ?`)
+      .bind(emailKey, since)
       .first<{ n: number }>();
-    if ((byUser?.n ?? 0) >= MAX_FAILURES_PER_WINDOW) throw err(429, 'rate_limited');
+    if ((byEmail?.n ?? 0) >= MAX_FAILURES_PER_EMAIL) throw err(429, 'rate_limited');
   }
 }
 
-/** Record a failed attempt; lock the account after 10 consecutive failures. */
-export async function recordFailure(c: Context<AppEnv>, userId: string | null, event: 'login_fail' | 'recover_fail'): Promise<void> {
-  const stmts = [auditStmt(c, userId, event)];
-  if (userId) {
-    stmts.push(
-      c.env.DB.prepare(
-        'UPDATE users SET failed_logins = failed_logins + 1, locked_until = CASE WHEN failed_logins + 1 >= ? THEN ? ELSE locked_until END WHERE id = ?',
-      ).bind(LOCK_AFTER_CONSECUTIVE, now() + LOCK_MS, userId),
-    );
-  }
-  await c.env.DB.batch(stmts);
+/** Record a failed attempt against the IP and the email key (the same for existing and unknown accounts). */
+export async function recordFailure(c: Context<AppEnv>, emailKey: string | null, event: 'login_fail' | 'recover_fail'): Promise<void> {
+  await auditStmt(c, emailKey, event).run();
 }

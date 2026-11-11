@@ -67,7 +67,7 @@ export const api = {
     call<{ userId: string; recoveryWrappedKey: string; publicKey: string; wrappedPrivateKey: string }>('POST', '/api/auth/recover/start', { email, recoveryAuth }),
   recover: (body: unknown) => call<KeyBundleDto>('POST', '/api/auth/recover', body),
   totpSetup: () => call<{ secret: string; uri: string }>('POST', '/api/auth/totp/setup'),
-  totpEnable: (code: string) => call<{ ok: true }>('POST', '/api/auth/totp/enable', { code }),
+  totpEnable: (code: string, authHash: string) => call<{ ok: true }>('POST', '/api/auth/totp/enable', { code, authHash }),
   totpDisable: (authHash: string) => call<{ ok: true }>('POST', '/api/auth/totp/disable', { authHash }),
   sync: (since: string) => call<SyncRes>('GET', `/api/sync${since ? `?since=${since}` : ''}`),
   putItem: (vid: string, iid: string, data: string, keyEpoch: number, expectedRevision: number | null) =>
@@ -89,7 +89,6 @@ const MESSAGES: Record<string, string> = {
   invalid_credentials: '邮箱、主密码或 Secret Key 不正确',
   totp_required: '请输入二次验证码',
   rate_limited: '尝试次数过多，请 15 分钟后再试',
-  account_locked: '账号已暂时锁定，请 15 分钟后再试',
   invalid_invite: '邀请码无效或已被使用',
   email_taken: '该邮箱已注册',
   conflict: '数据已在别处被修改',
