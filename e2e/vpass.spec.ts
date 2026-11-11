@@ -64,7 +64,8 @@ async function register(page: Page, email: string): Promise<Account> {
 }
 
 async function newLogin(page: Page, name: string, fields: { username?: string; password?: string; url?: string; notes?: string }) {
-  await page.locator('select.new-select').selectOption('login');
+  await page.getByRole('button', { name: '新建条目' }).click();
+  await page.getByRole('menuitem', { name: '登录' }).click();
   await page.getByLabel('名称', { exact: true }).fill(name);
   if (fields.username) await page.getByLabel('用户名', { exact: true }).fill(fields.username);
   if (fields.password) await page.getByLabel('密码', { exact: true }).fill(fields.password);
@@ -101,7 +102,8 @@ test('the server never sees plaintext (sentinel in password, URL and notes)', as
     url: `https://${SENTINEL.replace(/[^a-z0-9-]/gi, '')}.example/${encodeURIComponent(SENTINEL)}`,
     notes: `备注里也有 ${SENTINEL}`,
   });
-  await page.locator('select.new-select').selectOption('note');
+  await page.getByRole('button', { name: '新建条目' }).click();
+  await page.getByRole('menuitem', { name: '安全笔记' }).click();
   await page.getByLabel('名称', { exact: true }).fill(`笔记 ${SENTINEL}`);
   await page.getByLabel('备注').fill(SENTINEL);
   await page.getByRole('button', { name: '保存' }).click();
@@ -221,7 +223,7 @@ test('sharing: verify fingerprint, add, demote, remove with key rotation', async
   await unlock(pb);
   await pb.getByRole('button', { name: /家庭/ }).click();
   await expect(pb.getByText('家里 Wi-Fi')).toBeVisible();
-  await expect(pb.locator('select.new-select')).toBeVisible();
+  await expect(pb.getByRole('button', { name: '新建条目' })).toBeVisible();
 
   // Demote to viewer.
   await page.getByRole('button', { name: '成员与共享' }).click();
@@ -231,7 +233,7 @@ test('sharing: verify fingerprint, add, demote, remove with key rotation', async
   await unlock(pb);
   await pb.getByRole('button', { name: /家庭/ }).click();
   await expect(pb.getByText('家里 Wi-Fi')).toBeVisible();
-  await expect(pb.locator('select.new-select')).toHaveCount(0);
+  await expect(pb.getByRole('button', { name: '新建条目' })).toHaveCount(0);
 
   // Remove Bob → key rotation; Bob loses the vault.
   page.once('dialog', (d) => void d.accept());

@@ -3,6 +3,7 @@ import { ItemEditor } from '../components/ItemEditor.js';
 import { ItemView, Avatar } from '../components/ItemView.js';
 import { Generator } from '../components/Generator.js';
 import { Icon, type IconName } from '../components/Icon.js';
+import { NewItemMenu } from '../components/NewItemMenu.js';
 import { Button, ClipboardBanner, ErrorText, Modal, TextField } from '../components/ui.js';
 import { hostOf, type ItemType } from '../lib/item.js';
 import { errorMessage } from '../lib/api.js';
@@ -163,24 +164,13 @@ export function VaultApp({ st }: { st: PublicState }) {
               <div className="muted small">{items.length} 项</div>
             </div>
             {canWrite(targetVault) && (
-              <span className="new-btn" title="新建">
-                <Icon name="plus" />
-                <select
-                  value=""
-                  aria-label="新建条目"
-                  className="new-select"
-                  onChange={(e) => {
-                    if (!targetVault || !e.target.value) return;
-                    setSelected(null);
-                    setEditing({ vaultId: targetVault, id: null, type: e.target.value as ItemType });
-                  }}
-                >
-                  <option value="">新建…</option>
-                  <option value="login">登录</option>
-                  <option value="note">安全笔记</option>
-                  <option value="card">银行卡</option>
-                </select>
-              </span>
+              <NewItemMenu
+                onPick={(type) => {
+                  if (!targetVault) return;
+                  setSelected(null);
+                  setEditing({ vaultId: targetVault, id: null, type });
+                }}
+              />
             )}
           </div>
           <ul>
