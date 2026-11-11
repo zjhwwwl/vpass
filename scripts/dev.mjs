@@ -5,7 +5,7 @@ import { spawn, spawnSync } from 'node:child_process';
 const run = (cmd, args, opts = {}) => spawn(cmd, args, { stdio: 'inherit', shell: true, ...opts });
 
 spawnSync('pnpm', ['--filter', '@vpass/web', 'build'], { stdio: 'inherit', shell: true });
-spawnSync('pnpm', ['--filter', '@vpass/api', 'exec', 'wrangler', 'd1', 'migrations', 'apply', 'vpass', '--local'], { stdio: 'inherit', shell: true });
+spawnSync('pnpm', ['--filter', '@vpass/api', 'exec', 'wrangler', 'd1', 'migrations', 'apply', 'DB', '--local'], { stdio: 'inherit', shell: true });
 const children = [
   run('pnpm', ['--filter', '@vpass/web', 'exec', 'vite', 'build', '--watch']),
   run('pnpm', ['--filter', '@vpass/api', 'exec', 'wrangler', 'dev', '--port', '8787', '--ip', '127.0.0.1']),

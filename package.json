@@ -13,8 +13,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "e2e": "playwright test",
-    "db:migrate:local": "pnpm --filter @vpass/api exec wrangler d1 migrations apply vpass --local",
-    "db:migrate:remote": "pnpm --filter @vpass/api exec wrangler d1 migrations apply vpass --remote",
+    "db:migrate:local": "pnpm --filter @vpass/api exec wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "pnpm --filter @vpass/api exec wrangler d1 migrations apply DB --remote",
     "invite:local": "node scripts/create-invite.mjs --local",
     "invite:remote": "node scripts/create-invite.mjs --remote"
   },

@@ -29,10 +29,10 @@ Playwright 浏览器装在 `E:\ms-playwright`：运行前设置 `PLAYWRIGHT_BROW
 
 ## 首次部署（约半小时）
 
-1. `pnpm --filter @vpass/api exec wrangler d1 create vpass`，把返回的 `database_id` 填进 `apps/api/wrangler.toml`
+1. `pnpm --filter @vpass/api exec wrangler d1 create vpass-apac --location apac`，把返回的 `database_id` 填进 `apps/api/wrangler.toml`
 2. `pnpm db:migrate:remote`
 3. `wrangler secret put AUTH_PEPPER` 和 `wrangler secret put TOTP_ENC_KEY`（各用 `openssl rand -base64 32` 生成，**离线备份 AUTH_PEPPER**：丢了所有人都登不上）
-4. 在 `wrangler.toml` 的 `ADMIN_EMAILS` 写上你的邮箱
+4. 注册后，把你的用户 ID（`users.id`）写进 `wrangler.toml` 的 `ADMIN_USER_IDS`，重新部署
 5. `pnpm build && pnpm --filter @vpass/api exec wrangler deploy` → 绑定自定义域名（`workers_dev = false` 已关闭 workers.dev 入口）
 6. Cloudflare：SSL Full (strict)、Always Use HTTPS、最低 TLS 1.2；关闭 Rocket Loader、Email Obfuscation 等改写 HTML/JS 的功能；Access 邮箱白名单；WAF 限流覆盖 `/api/auth/*`
 7. `pnpm invite:remote` 生成第一个邀请码 → 注册 → 打印应急卡

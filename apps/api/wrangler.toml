@@ -18,9 +18,9 @@ not_found_handling = "single-page-application"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "vpass"
+database_name = "vpass-apac"
 # Replace with the id printed by `wrangler d1 create vpass`.
-database_id = "55b45825-22b8-4044-b36c-37291391e403"
+database_id = "3ac60a8d-24ba-4666-9466-2cd8879dd2f4"
 migrations_dir = "migrations"
 
 [vars]

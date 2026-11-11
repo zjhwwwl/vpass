@@ -10,7 +10,7 @@ const code = `VPI-${chars.slice(0, 4)}-${chars.slice(4, 8)}-${chars.slice(8, 12)
 const hash = createHash('sha256').update(code.replace(/-/g, '')).digest('hex');
 const expires = Date.now() + 7 * 24 * 3600 * 1000;
 const sql = `INSERT INTO invites (code_hash, created_by, used_by, expires_at) VALUES ('${hash}', NULL, NULL, ${expires});`;
-const r = spawnSync('pnpm', ['--filter', '@vpass/api', 'exec', 'wrangler', 'd1', 'execute', 'vpass', target, '--command', `"${sql}"`], {
+const r = spawnSync('pnpm', ['--filter', '@vpass/api', 'exec', 'wrangler', 'd1', 'execute', 'DB', target, '--command', `"${sql}"`], {
   stdio: ['ignore', 'ignore', 'inherit'],
   shell: true,
 });
