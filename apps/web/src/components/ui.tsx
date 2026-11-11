@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import QRCode from 'qrcode';
 import { copySecret, onClipboardCountdown } from '../lib/clipboard.js';
 import { session } from '../state/session.js';
+import { Icon } from './Icon.js';
 
 export function Button(props: {
   children: ReactNode;
@@ -95,8 +96,8 @@ export function PasswordField(props: {
           autoCapitalize="off"
           autoCorrect="off"
         />
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShow(!show)} aria-label={show ? '隐藏' : '显示'}>
-          {show ? '隐藏' : '显示'}
+        <button type="button" className="icon-btn" onClick={() => setShow(!show)} aria-label={show ? '隐藏' : '显示'} title={show ? '隐藏' : '显示'}>
+          <Icon name={show ? 'eyeOff' : 'eye'} />
         </button>
       </div>
       {props.hint && <div className="hint">{props.hint}</div>}

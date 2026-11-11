@@ -41,6 +41,7 @@ export function ItemEditor(props: { vaultId: string; existing: DecryptedItem | n
   return (
     <form className="item-editor" onSubmit={submit}>
       <h2>{props.existing ? '编辑' : '新建'}</h2>
+      <div className="form-group">
       <TextField label="名称" value={item.name} onChange={(v) => set('name', v)} autoFocus />
       {item.type === 'login' && (
         <>
@@ -65,11 +66,13 @@ export function ItemEditor(props: { vaultId: string; existing: DecryptedItem | n
             </div>
           ))}
           <Button small kind="ghost" onClick={() => set('urls', [...item.urls, ''])}>
-            + 网址
+            + 添加网址
           </Button>
           <TextField label="TOTP 密钥" value={item.totp} onChange={(v) => set('totp', v)} mono placeholder="Base32 密钥或 otpauth:// 链接" />
         </>
       )}
+      </div>
+      <div className="form-group">
       {item.fields.map((f, i) => (
         <div className="custom-field" key={i}>
           <input className="label-input" value={f.label} onChange={(e) => setField(i, { label: e.target.value })} placeholder="字段名" autoComplete="off" />
@@ -83,12 +86,14 @@ export function ItemEditor(props: { vaultId: string; existing: DecryptedItem | n
         </div>
       ))}
       <Button small kind="ghost" onClick={() => set('fields', [...item.fields, { label: '', value: '', hidden: false }])}>
-        + 自定义字段
+        + 添加自定义字段
       </Button>
       <TextField label="备注" value={item.notes} onChange={(v) => set('notes', v)} multiline />
       <label className="check">
-        <input type="checkbox" checked={item.favorite} onChange={(e) => set('favorite', e.target.checked)} /> 收藏
+        收藏
+        <input type="checkbox" checked={item.favorite} onChange={(e) => set('favorite', e.target.checked)} />
       </label>
+      </div>
       <ErrorText error={error} />
       <div className="row">
         <Button kind="primary" type="submit" disabled={busy}>

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ItemEditor } from '../components/ItemEditor.js';
-import { ItemView } from '../components/ItemView.js';
+import { ItemView, Avatar } from '../components/ItemView.js';
 import { Generator } from '../components/Generator.js';
+import { Icon, type IconName } from '../components/Icon.js';
 import { Button, ClipboardBanner, ErrorText, Modal, TextField } from '../components/ui.js';
 import { hostOf, type ItemType } from '../lib/item.js';
 import { errorMessage } from '../lib/api.js';
@@ -12,13 +13,13 @@ import { VaultMembers } from './Sharing.js';
 import { SecurityReport } from './SecurityReport.js';
 
 type Filter = 'all' | 'favorite' | ItemType;
-const FILTERS: [Filter, string][] = [
-  ['all', '全部'],
-  ['favorite', '收藏'],
-  ['login', '登录'],
-  ['note', '笔记'],
-  ['card', '银行卡'],
-  ['contact', '联系人'],
+const FILTERS: [Filter, string, IconName][] = [
+  ['all', '所有项目', 'grid'],
+  ['favorite', '收藏', 'star'],
+  ['login', '登录', 'key'],
+  ['note', '安全笔记', 'note'],
+  ['card', '银行卡', 'card'],
+  ['contact', '联系人', 'person'],
 ];
 
 export function VaultApp({ st }: { st: PublicState }) {
@@ -65,29 +66,34 @@ export function VaultApp({ st }: { st: PublicState }) {
     const v = vid ? session.vault(vid) : undefined;
     return !!v && v.role !== 'viewer';
   };
+  const listTitle = (currentVault?.name ?? '') || FILTERS.find(([f]) => f === filter)![1];
+  const syncTitle = st.lastError === 'offline' ? '离线' : st.lastError ? '同步失败' : st.lastSyncAt ? `已同步 ${new Date(st.lastSyncAt).toLocaleTimeString()}` : '未同步';
 
   return (
     <div className="app">
       <header className="topbar">
-        <button type="button" className="btn btn-ghost btn-sm only-mobile" onClick={() => setMenu(!menu)} aria-label="保管库菜单">
-          ☰
+        <button type="button" className="icon-btn only-mobile" onClick={() => setMenu(!menu)} aria-label="保管库菜单">
+          <Icon name="menu" />
         </button>
         <div className="brand small">
-          <img src="/icon.svg" alt="" width={24} height={24} />
+          <img src="/icon.svg" alt="" />
           <span>VPass</span>
         </div>
-        <input className="search" type="search" placeholder="搜索名称、用户名、网址…" value={query} onChange={(e) => setQuery(e.target.value)} autoComplete="off" spellCheck={false} />
+        <label className="searchbox">
+          <Icon name="search" size={16} />
+          <input type="search" placeholder="搜索" aria-label="搜索名称、用户名、网址" value={query} onChange={(e) => setQuery(e.target.value)} autoComplete="off" spellCheck={false} />
+        </label>
         <div className="topbar-actions">
-          <span className={`sync-dot${st.lastError ? ' err' : st.syncing ? ' busy' : ''}`} title={st.lastError === 'offline' ? '离线' : st.lastError ? '同步失败' : st.lastSyncAt ? `已同步 ${new Date(st.lastSyncAt).toLocaleTimeString()}` : '未同步'} />
-          <Button small kind="ghost" onClick={() => setPanel('generator')}>
-            生成器
-          </Button>
-          <Button small kind="ghost" onClick={() => setPanel('settings')}>
-            设置
-          </Button>
-          <Button small onClick={lockNow} title="立即锁定（Alt+L）">
-            锁定
-          </Button>
+          <span className={`sync-dot${st.lastError ? ' err' : st.syncing ? ' busy' : ''}`} title={syncTitle} />
+          <button type="button" className="icon-btn hide-narrow" onClick={() => setPanel('generator')} title="密码生成器" aria-label="密码生成器">
+            <Icon name="wand" />
+          </button>
+          <button type="button" className="icon-btn" onClick={() => setPanel('settings')} title="设置" aria-label="设置">
+            <Icon name="gear" />
+          </button>
+          <button type="button" className="icon-btn" onClick={lockNow} title="立即锁定（Alt+L）" aria-label="锁定">
+            <Icon name="lock" />
+          </button>
         </div>
       </header>
       {!st.online && <div className="banner">离线模式：显示的是本机缓存，修改需要联网。</div>}
@@ -107,51 +113,74 @@ export function VaultApp({ st }: { st: PublicState }) {
       <div className="columns">
         <nav className={`sidebar${menu ? ' open' : ''}`}>
           <div className="nav-group">
+            <div className="nav-title">保管库</div>
             <button className={!vaultId ? 'active' : ''} onClick={() => (setVaultId(null), setMenu(false))}>
-              所有保管库
+              <Icon name="grid" />
+              <span className="label">全部保管库</span>
             </button>
             {vaults.map((v) => (
               <button key={v.id} className={vaultId === v.id ? 'active' : ''} onClick={() => (setVaultId(v.id), setMenu(false))}>
-                {v.kind === 'shared' ? '👥 ' : '🔒 '}
-                {v.name}
+                <Icon name={v.kind === 'shared' ? 'people' : 'lock'} />
+                <span className="label">{v.name}</span>
                 {v.role !== 'owner' && <span className="badge">{v.role === 'viewer' ? '只读' : '可编辑'}</span>}
               </button>
             ))}
             <Button small kind="ghost" onClick={() => setPanel('newVault')}>
-              + 新建共享库
+              <Icon name="plus" size={15} /> 新建共享库
             </Button>
           </div>
           <div className="nav-group">
-            {FILTERS.map(([f, label]) => (
+            <div className="nav-title">分类</div>
+            {FILTERS.map(([f, label, icon]) => (
               <button key={f} className={filter === f ? 'active' : ''} onClick={() => (setFilter(f), setMenu(false))}>
-                {label}
+                <Icon name={icon} />
+                <span className="label">{label}</span>
               </button>
             ))}
           </div>
           <div className="nav-group">
-            <button onClick={() => setPanel('report')}>安全报告</button>
-            {currentVault?.kind === 'shared' && <button onClick={() => setPanel('members')}>成员与共享</button>}
+            <div className="nav-title">工具</div>
+            <button onClick={() => (setPanel('report'), setMenu(false))}>
+              <Icon name="shield" />
+              <span className="label">安全报告</span>
+            </button>
+            <button className="only-mobile-flex" onClick={() => (setPanel('generator'), setMenu(false))}>
+              <Icon name="wand" />
+              <span className="label">密码生成器</span>
+            </button>
+            {currentVault?.kind === 'shared' && (
+              <button onClick={() => (setPanel('members'), setMenu(false))}>
+                <Icon name="people" />
+                <span className="label">成员与共享</span>
+              </button>
+            )}
           </div>
         </nav>
         <section className={`list${selected || editing ? ' hide-mobile' : ''}`}>
           <div className="list-head">
-            <span className="muted">{items.length} 项</span>
+            <div>
+              <h2>{listTitle}</h2>
+              <div className="muted small">{items.length} 项</div>
+            </div>
             {canWrite(targetVault) && (
-              <select
-                className="new-select"
-                value=""
-                aria-label="新建条目"
-                onChange={(e) => {
-                  if (!targetVault || !e.target.value) return;
-                  setSelected(null);
-                  setEditing({ vaultId: targetVault, id: null, type: e.target.value as ItemType });
-                }}
-              >
-                <option value="">+ 新建…</option>
-                <option value="login">登录</option>
-                <option value="note">安全笔记</option>
-                <option value="card">银行卡</option>
-              </select>
+              <span className="new-btn" title="新建">
+                <Icon name="plus" />
+                <select
+                  value=""
+                  aria-label="新建条目"
+                  className="new-select"
+                  onChange={(e) => {
+                    if (!targetVault || !e.target.value) return;
+                    setSelected(null);
+                    setEditing({ vaultId: targetVault, id: null, type: e.target.value as ItemType });
+                  }}
+                >
+                  <option value="">新建…</option>
+                  <option value="login">登录</option>
+                  <option value="note">安全笔记</option>
+                  <option value="card">银行卡</option>
+                </select>
+              </span>
             )}
           </div>
           <ul>
@@ -164,7 +193,7 @@ export function VaultApp({ st }: { st: PublicState }) {
                     setSelected({ vaultId: it.vaultId, id: it.id });
                   }}
                 >
-                  <span className="avatar">{(it.item.name || '?').slice(0, 1).toUpperCase()}</span>
+                  <Avatar name={it.item.name} />
                   <span className="li-text">
                     <span className="li-title">
                       {it.item.favorite && <span className="star">★</span>}
@@ -175,21 +204,21 @@ export function VaultApp({ st }: { st: PublicState }) {
                 </button>
               </li>
             ))}
-            {items.length === 0 && <li className="empty">{query ? '没有匹配的条目' : '这里还是空的'}</li>}
+            {items.length === 0 && <li className="empty">{query ? '没有匹配的项目' : '还没有项目'}</li>}
           </ul>
         </section>
         <main className={`detail${selected || editing ? '' : ' hide-mobile'}`}>
           {(selected || editing) && (
-            <Button
-              small
-              kind="ghost"
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm only-mobile"
               onClick={() => {
                 setSelected(null);
                 setEditing(null);
               }}
             >
-              ← 返回
-            </Button>
+              <Icon name="chevronLeft" size={16} /> {listTitle}
+            </button>
           )}
           {editing ? (
             <ItemEditor
@@ -213,7 +242,12 @@ export function VaultApp({ st }: { st: PublicState }) {
               }}
             />
           ) : (
-            <div className="placeholder muted">选择一个条目</div>
+            <div className="placeholder">
+              <div>
+                <Icon name="lock" size={56} />
+                <div>未选择项目</div>
+              </div>
+            </div>
           )}
         </main>
       </div>

@@ -65,10 +65,10 @@ async function register(page: Page, email: string): Promise<Account> {
 
 async function newLogin(page: Page, name: string, fields: { username?: string; password?: string; url?: string; notes?: string }) {
   await page.locator('select.new-select').selectOption('login');
-  await page.getByLabel('名称').fill(name);
-  if (fields.username) await page.getByLabel('用户名').fill(fields.username);
+  await page.getByLabel('名称', { exact: true }).fill(name);
+  if (fields.username) await page.getByLabel('用户名', { exact: true }).fill(fields.username);
   if (fields.password) await page.getByLabel('密码', { exact: true }).fill(fields.password);
-  if (fields.url) await page.getByLabel('网址').fill(fields.url);
+  if (fields.url) await page.getByLabel('网址', { exact: true }).fill(fields.url);
   if (fields.notes) await page.getByLabel('备注').fill(fields.notes);
   await page.getByRole('button', { name: '保存' }).click();
   await expect(page.locator('.item-view h2', { hasText: name })).toBeVisible();
@@ -102,7 +102,7 @@ test('the server never sees plaintext (sentinel in password, URL and notes)', as
     notes: `备注里也有 ${SENTINEL}`,
   });
   await page.locator('select.new-select').selectOption('note');
-  await page.getByLabel('名称').fill(`笔记 ${SENTINEL}`);
+  await page.getByLabel('名称', { exact: true }).fill(`笔记 ${SENTINEL}`);
   await page.getByLabel('备注').fill(SENTINEL);
   await page.getByRole('button', { name: '保存' }).click();
   await expect(page.locator('.item-view h2', { hasText: '笔记' })).toBeVisible();
@@ -199,8 +199,8 @@ test('sharing: verify fingerprint, add, demote, remove with key rotation', async
   await pb.keyboard.press('Escape');
 
   // Owner creates a shared vault with one item.
-  await page.getByRole('button', { name: '+ 新建共享库' }).click();
-  await page.getByLabel(/名称/).fill('家庭');
+  await page.getByRole('button', { name: '新建共享库' }).click();
+  await page.getByLabel('名称（会加密存储）').fill('家庭');
   await page.getByRole('button', { name: '创建' }).click();
   await page.getByRole('button', { name: /家庭/ }).click();
   await newLogin(page, '家里 Wi-Fi', { password: 'wifi-secret-123' });
