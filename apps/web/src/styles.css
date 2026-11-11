@@ -1261,3 +1261,10 @@ progress::-moz-progress-bar {
 .input-row .icon-btn {
   margin-bottom: 4px;
 }
+
+/* Native dropdown lists: always white background with black text (dark mode otherwise inherits white text). */
+select option,
+select optgroup {
+  background: #ffffff;
+  color: #1d1d1f;
+}
